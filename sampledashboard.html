@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sample Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      padding: 20px;
+      gap: 20px;
+    }
+    #rfid-section, #gps-section {
+      flex: 1 1 500px;
+      background: #fafafa;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h2 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #999; padding: 8px; text-align: center; }
+    thead th { position: sticky; top: 0; background: #f8f8f8; }
+    canvas { width: 100% !important; height: 250px !important; }
+    #map { width: 100%; height: 500px; margin-top: 10px; }
+    .summary-box { margin-bottom: 10px; font-weight: bold; }
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8n0a4Rcps1QCdSV60C3B6Crca40WKAg0"></script>
+</head>
+<body>
+  <div class="container">
+    <div id="rfid-section">
+      <h2>📦 RFID 실시간 데이터</h2>
+      <div class="summary-box" id="rfid-summary">총 감지: 0회 | 실패: 0회</div>
+      <table>
+        <thead><tr><th>UID</th><th>시간</th><th>위치</th></tr></thead>
+        <tbody id="rfid-table"></tbody>
+      </table>
+      <canvas id="rfidChart"></canvas>
+    </div>
+    <div id="gps-section">
+      <h2>🚚 GPS 실시간 위치</h2>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCTI9qiQ0jJPCH_MoQJ5mVjBjvD3zQkpIU",
+      authDomain: "capstonedesign-fe014.firebaseapp.com",
+      databaseURL: "https://capstonedesign-fe014-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "capstonedesign-fe014",
+      storageBucket: "capstonedesign-fe014.appspot.com",
+      messagingSenderId: "187566571167",
+      appId: "G-HGB4T76H6S"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const table = document.getElementById("rfid-table");
+    const chartLabels = [];
+    const chartData = [];
+    let total = 0, fail = 0;
+
+    const rfidChart = new Chart(document.getElementById("rfidChart"), {
+      type: "line",
+      data: {
+        labels: chartLabels,
+        datasets: [{
+          label: "감지 성공률(%)",
+          data: chartData,
+          borderWidth: 2,
+          borderColor: "blue"
+        }]
+      }
+    });
+
+    db.ref("/rfid_logs").on("child_added", (snapshot) => {
+      const data = snapshot.val();
+      const row = document.createElement("tr");
+      const uid = data.tagID || "감지 실패";
+      const time = data.timestamp || "-";
+      const loc = data.location || "-";
+      const acc = data.accuracy_percent || 0;
+
+      if (uid === "감지 실패") {
+        fail++;
+        row.style.backgroundColor = "#ffe0e0";
+      }
+      total++;
+      document.getElementById("rfid-summary").innerText = `총 감지: ${total}회 | 실패: ${fail}회`;
+
+      row.innerHTML = `<td>${uid}</td><td>${time}</td><td>${loc}</td>`;
+      table.appendChild(row);
+      chartLabels.push(time);
+      chartData.push(acc);
+      rfidChart.update();
+    });
+
+    let map, marker, polyline, gpsPath = [];
+    let infoWindow;
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 17,
+        center: { lat: 35.2451897, lng: 128.693723 }
+      });
+      marker = new google.maps.Marker({ map: map });
+      infoWindow = new google.maps.InfoWindow();
+      polyline = new google.maps.Polyline({
+        path: gpsPath,
+        geodesic: true,
+        strokeColor: "#FF0000",
+        strokeOpacity: 1.0,
+        strokeWeight: 3,
+        map: map
+      });
+
+      db.ref("/gps_logs").on("value", (snapshot) => {
+        gpsPath = [];
+        const data = snapshot.val();
+        if (data) {
+          Object.entries(data).forEach(([key, value]) => {
+            if (value.latitude && value.longitude) {
+              const latlng = new google.maps.LatLng(value.latitude, value.longitude);
+              gpsPath.push(latlng);
+              if (key === Object.keys(data).slice(-1)[0]) {
+                marker.setPosition(latlng);
+                map.setCenter(latlng);
+                infoWindow.setContent(`🕒 ${value.timestamp || "시간 없음"}`);
+                infoWindow.open(map, marker);
+              }
+            }
+          });
+          polyline.setPath(gpsPath);
+        }
+      });
+    }
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
