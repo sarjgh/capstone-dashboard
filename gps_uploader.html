@@ -1,69 +1,52 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#ffffff" />
-  <title>GPS 위치 업로더</title>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-</head>
-<body>
-  <h2>📡 GPS 위치 업로드 중...</h2>
-  <p id="lat">📍 위도: -</p>
-  <p id="lng">📍 경도: -</p>
-  <p id="timestamp">🕒 마지막 전송 시간: -</p>
-  <button onclick="window.open('https://sarjgh.github.io/capstone-dashboard/', '_blank')">📊 대시보드 보기</button>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCTI9qiQ0jJPCH_MoQJ5mVjBjvD3zQkpIU",
+    authDomain: "capstonedesign-fe014.firebaseapp.com",
+    databaseURL: "https://capstonedesign-fe014-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "capstonedesign-fe014",
+    storageBucket: "capstonedesign-fe014.appspot.com",
+    messagingSenderId: "187566571167",
+    appId: "1:187566571167:web:6d596a12d4d8ce34472caa",
+    measurementId: "G-HGB4T76H6S"
+  };
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCTI9qiQ0jJPCH_MoQJ5mVjBjvD3zQkpIU",
-      authDomain: "capstonedesign-fe014.firebaseapp.com",
-      databaseURL: "https://capstonedesign-fe014-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "capstonedesign-fe014",
-      storageBucket: "capstonedesign-fe014.appspot.com",
-      messagingSenderId: "187566571167",
-      appId: "1:187566571167:web:6d596a12d4d8ce34472caa",
-      measurementId: "G-HGB4T76H6S"
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  function uploadLocation(position) {
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+    const now = new Date().toISOString();
+
+    document.getElementById("lat").innerText = `📍 위도: ${lat}`;
+    document.getElementById("lng").innerText = `📍 경도: ${lng}`;
+    document.getElementById("timestamp").innerText = `🕒 마지막 전송 시간: ${now}`;
+
+    const data = {
+      latitude: lat,
+      longitude: lng,
+      timestamp: now,
+      error: 0
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    db.ref("gps_logs").push(data);
+  }
 
-    function uploadLocation(position) {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const now = new Date().toISOString();
+  function handleError(err) {
+    document.getElementById("lat").innerText = "❌ 위치 오류: " + err.message;
+    document.getElementById("lng").innerText = "";
+    document.getElementById("timestamp").innerText = "";
+  }
 
-      document.getElementById("lat").innerText = `📍 위도: ${lat}`;
-      document.getElementById("lng").innerText = `📍 경도: ${lng}`;
-      document.getElementById("timestamp").innerText = `🕒 마지막 전송 시간: ${now}`;
-
-      const data = {
-        latitude: lat,
-        longitude: lng,
-        timestamp: now,
-        error: 0
-      };
-
-      db.ref("gps_logs").push(data);
-    }
-
-    function handleError(err) {
-      document.getElementById("lat").innerText = "❌ 위치 오류: " + err.message;
-      document.getElementById("lng").innerText = "";
-      document.getElementById("timestamp").innerText = "";
-    }
-
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(uploadLocation, handleError, {
+  // ✅ 3초마다 GPS 요청
+  if (navigator.geolocation) {
+    setInterval(() => {
+      navigator.geolocation.getCurrentPosition(uploadLocation, handleError, {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        timeout: 10000
       });
-    } else {
-      document.getElementById("lat").innerText = "⚠️ 이 기기에서 위치 사용 불가.";
-    }
-  </script>
-</body>
-</html>
+    }, 3000);
+  } else {
+    document.getElementById("lat").innerText = "⚠️ 이 기기에서 위치 사용 불가.";
+  }
+</script>
